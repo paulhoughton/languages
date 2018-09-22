@@ -1,16 +1,17 @@
-module Main exposing (..)
+module Main exposing (main)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Http
-import Json.Decode exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Http
+import Browser
+import Json.Decode exposing (..)
 import Pie exposing (generate)
-
+import List.Extra exposing (scanl)
 
 main =
-    program
-        { init = init "paulhoughton"
+      Browser.element
+        { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
@@ -30,11 +31,10 @@ type alias Model =
     , data : LangList
     }
 
-
-init : String -> ( Model, Cmd Msg )
-init username =
-    ( Model username []
-    , getLanguages username
+init : String -> (Model, Cmd Msg)
+init defaultUsername =
+    ( Model defaultUsername []
+    , getLanguages defaultUsername
     )
 
 
@@ -64,28 +64,28 @@ view : Model -> Html Msg
 view model =
     let
         colours i =
-            "hsl(200, 100%, " ++ toString ((i * 100) // List.length (model.data) + 1) ++ "%)"
+            "hsl(200, 100%, " ++ String.fromInt ((i * 100) // List.length model.data + 1) ++ "%)"
 
         total =
             List.foldr (\a b -> a.count + b) 0 model.data
 
         data =
-            List.scanl (\a b -> { lang = a.lang, count = a.count, running = a.count + b.running }) { lang = "", count = 0, running = 0 } model.data
+            scanl (\a b -> { lang = a.lang, count = a.count, running = a.count + b.running }) { lang = "", count = 0, running = 0 } model.data
     in
-        div []
-            [ header []
-                [ input [ type_ "text", placeholder "Username", onInput Username, Html.Attributes.value model.username ] []
-                , button [ onClick Go ] [ text "Go" ]
+    div []
+        [ header []
+            [ input [ type_ "text", placeholder "Username", onInput Username, Html.Attributes.value model.username ] []
+            , button [ onClick Go ] [ text "Go" ]
+            ]
+        , Html.main_ []
+            [ div []
+                [ ul [] (List.indexedMap (\i l -> li [ style "color" (colours i) ] [ text (l.lang ++ " " ++ String.fromInt (100 * l.count // total) ++ "%") ]) (List.reverse model.data))
                 ]
-            , Html.main_ []
-                [ div []
-                    [ ul [] (List.indexedMap (\i l -> li [ style [ ( "color", colours (i) ) ] ] [ text (l.lang ++ " " ++ toString (100 * l.count // total) ++ "%") ]) (List.reverse model.data))
-                    ]
-                , div []
-                    [ generate colours total data
-                    ]
+            , div []
+                [ generate colours total data
                 ]
             ]
+        ]
 
 
 subscriptions : Model -> Sub Msg
@@ -100,9 +100,9 @@ getLanguages username =
             "/languages/" ++ username
 
         request =
-            Http.get url (decodeList)
+            Http.get url decodeList
     in
-        Http.send DataResult request
+    Http.send DataResult request
 
 
 decodeList : Decoder LangList
